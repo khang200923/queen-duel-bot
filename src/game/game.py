@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from typing import Any
 import numpy as np
 import torch
 import torch.nn as nn
@@ -6,8 +7,8 @@ from src.game.state import GameState
 
 @dataclass
 class Game:
-    white: nn.Module
-    black: nn.Module
+    white: Any
+    black: Any
     device: torch.device = field(default_factory=lambda: torch.device("cuda" if torch.cuda.is_available() else "cpu"))
     blockers_board: np.ndarray = field(init=False, repr=False)
     whiteq_board: np.ndarray = field(init=False, repr=False)
@@ -15,9 +16,6 @@ class Game:
     is_white_turn: bool = field(default=True)
 
     def __post_init__(self):
-        self.white.to(self.device)
-        self.black.to(self.device)
-
         self.reset()
 
     def reset(self):
@@ -34,7 +32,6 @@ class Game:
         blockers_board_tensor = torch.tensor(self.blockers_board, dtype=torch.float32, device=self.device)
         whiteq_board_tensor = torch.tensor(self.whiteq_board, dtype=torch.float32, device=self.device)
         blackq_board_tensor = torch.tensor(self.blackq_board, dtype=torch.float32, device=self.device)
-        is_white_turn_tensor = torch.tensor([turn == self.is_white_turn], dtype=torch.bool, device=self.device)
 
         # Flip the board according to the player's perspective
         if not turn:
@@ -46,7 +43,7 @@ class Game:
             blockers_board=blockers_board_tensor,
             selfq_board=whiteq_board_tensor if turn else blackq_board_tensor,
             oppq_board=blackq_board_tensor if turn else whiteq_board_tensor,
-            is_self_turn=is_white_turn_tensor
+            is_self_turn=turn
         )
 
     def make_move(self, move: tuple[int, int], turn: bool | None = None):
@@ -58,8 +55,8 @@ class Game:
         assert turn == self.is_white_turn, "It's not your turn!"
 
         state = self.get_state(turn)
-        current_queen_pos = state.find_queen_position()
-        legal_moves_mask = state.mask_legal_moves()
+        current_queen_pos = state.find_queen_position(True) # True is objective
+        legal_moves_mask = state.mask_legal_moves(True)
         assert legal_moves_mask[move], "Illegal move!"
 
         self.blockers_board[current_queen_pos] = 1
@@ -73,19 +70,24 @@ class Game:
             self.whiteq_board[move] = 0
         self.is_white_turn = not self.is_white_turn
 
-    def agent_move(self) -> tuple[np.ndarray, tuple[int, int]]:
+    def agent_move(self) -> tuple[np.ndarray, tuple[int, int], bool]:
         state = self.get_state()
-        model = self.white if self.is_white_turn else self.black
+        agent = self.white if self.is_white_turn else self.black
 
-        with torch.no_grad():
-            action_probs = model(state.selfq_board, state.oppq_board, state.blockers_board)
-        action_probs = action_probs.cpu().numpy()
+        action_probs = agent.play(state)
         legal_moves_mask = state.mask_legal_moves().cpu().numpy()
         legal_action_probs = action_probs * legal_moves_mask.astype(np.float32)
+        legal = True
         try:
             legal_action_probs /= legal_action_probs.sum()
         except ZeroDivisionError:
+            legal = False
             legal_action_probs.fill(1.0 / legal_moves_mask.sum())
+            legal_action_probs *= legal_moves_mask.astype(np.float32)
+        if np.isnan(legal_action_probs).any():
+            legal = False
+            legal_action_probs.fill(1.0 / legal_moves_mask.sum())
+            legal_action_probs *= legal_moves_mask.astype(np.float32)
 
         move = np.random.choice(np.arange(64), p=legal_action_probs.flatten())
         move = (move // 8, move % 8)
@@ -93,7 +95,7 @@ class Game:
             move = (7 - move[0], move[1]) # Flip again because of perspective
         self.make_move(move)
 
-        return action_probs, move
+        return action_probs, move, legal
 
     def result(self) -> bool | None:
         state = self.get_state()
@@ -104,3 +106,17 @@ class Game:
         if not state.mask_legal_moves().any():
             return not self.is_white_turn # suffocation -> ded
         return None
+
+    def repr_board(self) -> str:
+        board = np.zeros((8, 8), dtype=str)
+        for i in range(8):
+            for j in range(8):
+                if self.blockers_board[i, j] == 1:
+                    board[i, j] = '█'
+                elif self.whiteq_board[i, j] == 1:
+                    board[i, j] = 'W'
+                elif self.blackq_board[i, j] == 1:
+                    board[i, j] = 'B'
+                else:
+                    board[i, j] = '.'
+        return '\n'.join([' '.join(row) for row in board])
