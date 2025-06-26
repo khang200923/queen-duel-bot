@@ -1,15 +1,12 @@
 from dataclasses import dataclass, field
 from typing import Any
 import numpy as np
-import torch
-import torch.nn as nn
 from src.game.state import GameState
 
 @dataclass
 class Game:
     white: Any
     black: Any
-    device: torch.device = field(default_factory=lambda: torch.device("cuda" if torch.cuda.is_available() else "cpu"))
     blockers_board: np.ndarray = field(init=False, repr=False)
     whiteq_board: np.ndarray = field(init=False, repr=False)
     blackq_board: np.ndarray = field(init=False, repr=False)
@@ -29,14 +26,10 @@ class Game:
         if turn is None:
             turn = self.is_white_turn
 
-        blockers_board_tensor = torch.tensor(self.blockers_board, dtype=torch.float32, device=self.device)
-        whiteq_board_tensor = torch.tensor(self.whiteq_board, dtype=torch.float32, device=self.device)
-        blackq_board_tensor = torch.tensor(self.blackq_board, dtype=torch.float32, device=self.device)
-
         return GameState(
-            blockers_board=blockers_board_tensor,
-            selfq_board=whiteq_board_tensor if turn else blackq_board_tensor,
-            oppq_board=blackq_board_tensor if turn else whiteq_board_tensor,
+            blockers_board=self.blockers_board,
+            selfq_board=self.whiteq_board if turn else self.blackq_board,
+            oppq_board=self.blackq_board if turn else self.whiteq_board,
             is_self_turn=turn
         )
 
@@ -69,7 +62,7 @@ class Game:
         agent = self.white if self.is_white_turn else self.black
 
         action_probs = agent.play(state)
-        legal_moves_mask = state.mask_legal_moves().cpu().numpy()
+        legal_moves_mask = state.mask_legal_moves()
         legal_action_probs = action_probs * legal_moves_mask.astype(np.float32)
         legal = True
         try:
