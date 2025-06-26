@@ -33,12 +33,6 @@ class Game:
         whiteq_board_tensor = torch.tensor(self.whiteq_board, dtype=torch.float32, device=self.device)
         blackq_board_tensor = torch.tensor(self.blackq_board, dtype=torch.float32, device=self.device)
 
-        # Flip the board according to the player's perspective
-        if not turn:
-            blockers_board_tensor = blockers_board_tensor.flip(0)
-            whiteq_board_tensor = whiteq_board_tensor.flip(0)
-            blackq_board_tensor = blackq_board_tensor.flip(0)
-
         return GameState(
             blockers_board=blockers_board_tensor,
             selfq_board=whiteq_board_tensor if turn else blackq_board_tensor,
@@ -55,8 +49,8 @@ class Game:
         assert turn == self.is_white_turn, "It's not your turn!"
 
         state = self.get_state(turn)
-        current_queen_pos = state.find_queen_position(True) # True is objective
-        legal_moves_mask = state.mask_legal_moves(True)
+        current_queen_pos = state.find_queen_position()
+        legal_moves_mask = state.mask_legal_moves()
         assert legal_moves_mask[move], "Illegal move!"
 
         self.blockers_board[current_queen_pos] = 1
@@ -91,8 +85,6 @@ class Game:
 
         move = np.random.choice(np.arange(64), p=legal_action_probs.flatten())
         move = (move // 8, move % 8)
-        if not self.is_white_turn:
-            move = (7 - move[0], move[1]) # Flip again because of perspective
         self.make_move(move)
 
         return action_probs, move, legal
