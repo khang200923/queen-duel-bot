@@ -4,20 +4,25 @@ import torch
 
 @dataclass
 class GameState:
-    blockers_board: np.ndarray
-    selfq_board: np.ndarray
-    oppq_board: np.ndarray
+    blockers_board: np.ndarray # shape (8, 8)
+    selfq_board: np.ndarray # shape (8, 8)
+    oppq_board: np.ndarray # shape (8, 8)
     is_self_turn: bool
+    _mask_cache: np.ndarray | None = field(default=None, repr=False)
 
     def find_queen_position(self) -> tuple[int, int]:
         assert (self.selfq_board == 1).sum() == 1, "There should be exactly one queen on the self board."
         assert (self.selfq_board == 0).sum() == 63, "There should be no other queens on the self board."
+        # print("fdaadf", np.argwhere(self.selfq_board == 1))
         queen_pos = np.argwhere(self.selfq_board == 1).squeeze(0)
         res = (queen_pos[0].item(), queen_pos[1].item())
         assert isinstance(res[0], int) and isinstance(res[1], int), "Queen position should be integers."
         return res # type: ignore
 
     def mask_legal_moves(self) -> np.ndarray:
+        if self._mask_cache is not None:
+            return self._mask_cache
+
         mask = np.zeros_like(self.selfq_board, dtype=bool)
         r0, c0 = self.find_queen_position()
 
@@ -39,6 +44,7 @@ class GameState:
                 r += dr_it
                 c += dc_it
 
+        self._mask_cache = mask.copy()
         return mask
 
     def convert_to_torch(self, device: torch.device | None = None) -> 'GameStateTorch':
@@ -58,3 +64,6 @@ class GameStateTorch:
     blockers_board: torch.Tensor
     selfq_board: torch.Tensor
     oppq_board: torch.Tensor
+
+    def all_boards(self) -> torch.Tensor:
+        return torch.stack([self.selfq_board, self.oppq_board, self.blockers_board], dim=0)
