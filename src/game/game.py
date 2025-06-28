@@ -128,3 +128,12 @@ class Game:
                 else:
                     board[i, j] = '.'
         return '\n'.join([' '.join(row) for row in board])
+
+    def heuristic_reward(self) -> float:
+        if self.result is not None:
+            return 0.0
+        state = self.get_state()
+        legal_moves_num = state.mask_legal_moves().sum()
+        oppo_state = self.get_state(not self.is_white_turn)
+        oppo_legal_moves_num = oppo_state.mask_legal_moves().sum()
+        return legal_moves_num / 64 - oppo_legal_moves_num / 64
