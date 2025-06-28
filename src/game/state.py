@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 import numpy as np
+import torch
 
 @dataclass
 class GameState:
@@ -11,7 +12,7 @@ class GameState:
     def find_queen_position(self) -> tuple[int, int]:
         assert (self.selfq_board == 1).sum() == 1, "There should be exactly one queen on the self board."
         assert (self.selfq_board == 0).sum() == 63, "There should be no other queens on the self board."
-        queen_pos = np.argwhere(self.selfq_board == 1)
+        queen_pos = np.argwhere(self.selfq_board == 1).squeeze(0)
         res = (queen_pos[0].item(), queen_pos[1].item())
         assert isinstance(res[0], int) and isinstance(res[1], int), "Queen position should be integers."
         return res # type: ignore
@@ -39,3 +40,21 @@ class GameState:
                 c += dc_it
 
         return mask
+
+    def convert_to_torch(self, device: torch.device | None = None) -> 'GameStateTorch':
+        if device is None:
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        blockers_board_tensor = torch.tensor(self.blockers_board, dtype=torch.float32, device=device)
+        selfq_board_tensor = torch.tensor(self.selfq_board, dtype=torch.float32, device=device)
+        oppq_board_tensor = torch.tensor(self.oppq_board, dtype=torch.float32, device=device)
+        return GameStateTorch(
+            blockers_board=blockers_board_tensor,
+            selfq_board=selfq_board_tensor,
+            oppq_board=oppq_board_tensor
+        )
+
+@dataclass
+class GameStateTorch:
+    blockers_board: torch.Tensor
+    selfq_board: torch.Tensor
+    oppq_board: torch.Tensor
