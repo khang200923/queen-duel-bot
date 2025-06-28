@@ -16,12 +16,15 @@ class Game:
     _state_cache_black: GameState | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self):
-        self.reset()
-
-    def reset(self):
         self.blockers_board = np.zeros((8, 8), dtype=np.int32)
         self.whiteq_board = np.zeros((8, 8), dtype=np.int32)
         self.blackq_board = np.zeros((8, 8), dtype=np.int32)
+        self.reset()
+
+    def reset(self):
+        self.blockers_board.fill(0)
+        self.whiteq_board.fill(0)
+        self.blackq_board.fill(0)
         self.whiteq_board[0, 4] = 1
         self.blackq_board[7, 3] = 1
         self.is_white_turn = True
@@ -80,11 +83,6 @@ class Game:
             self.whiteq_board[move] = 0
         self.is_white_turn = not self.is_white_turn
 
-        # if (self.whiteq_board == 1).sum() == 1:
-            # print("yaw", self.whiteq_board, self.result)
-        # if (self.blackq_board == 1).sum() == 1:
-            # print("yab", self.blackq_board, self.result)
-
         self._state_cache_white = None
         self._state_cache_black = None
 
@@ -94,7 +92,6 @@ class Game:
         new_state = self.get_state(self.is_white_turn)
         if new_state.mask_legal_moves().sum() == 0:
             self.result = not self.is_white_turn
-        # print("fffff", new_state.mask_legal_moves().flatten())
 
     def agent_move(self) -> tuple[np.ndarray, int, bool]:
         state = self.get_state()
@@ -102,27 +99,16 @@ class Game:
 
         action_probs = agent.play(state)
         legal_moves_mask = state.mask_legal_moves()
-        # print("z1", legal_moves_mask.flatten())
-        legal_action_probs = action_probs * legal_moves_mask.astype(np.float32)
+        mask = legal_moves_mask.astype(np.float32)
+        legal_action_probs = action_probs * mask
         legal = True
 
-        # print("b", legal_action_probs.flatten())
-
-        try:
-            legal_action_probs /= legal_action_probs.sum()
-        except ZeroDivisionError:
-            # print("bb1", legal_action_probs.flatten())
-            legal = False
-            legal_action_probs.fill(1.0 / legal_moves_mask.sum())
-            legal_action_probs *= legal_moves_mask.astype(np.float32)
+        legal_action_probs /= legal_action_probs.sum()
         if np.isnan(legal_action_probs).any():
-            # print("bb2", legal_action_probs.flatten())
             legal = False
             legal_action_probs.fill(1.0 / legal_moves_mask.sum())
-            legal_action_probs *= legal_moves_mask.astype(np.float32)
+            legal_action_probs *= mask
 
-        # print("a", legal_action_probs.flatten())
-        # print("z2", legal_moves_mask.flatten())
         move = np.random.choice(np.arange(64), p=legal_action_probs.flatten())
         movee = (move // 8, move % 8)
         self.make_move(movee, _mask_cache=legal_moves_mask)

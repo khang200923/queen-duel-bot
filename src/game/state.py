@@ -13,7 +13,6 @@ class GameState:
     def find_queen_position(self) -> tuple[int, int]:
         assert (self.selfq_board == 1).sum() == 1, "There should be exactly one queen on the self board."
         assert (self.selfq_board == 0).sum() == 63, "There should be no other queens on the self board."
-        # print("fdaadf", np.argwhere(self.selfq_board == 1))
         queen_pos = np.argwhere(self.selfq_board == 1).squeeze(0)
         res = (queen_pos[0].item(), queen_pos[1].item())
         assert isinstance(res[0], int) and isinstance(res[1], int), "Queen position should be integers."
