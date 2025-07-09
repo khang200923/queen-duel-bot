@@ -52,10 +52,12 @@ class GameState:
         blockers_board_tensor = torch.tensor(self.blockers_board, dtype=torch.float32, device=device)
         selfq_board_tensor = torch.tensor(self.selfq_board, dtype=torch.float32, device=device)
         oppq_board_tensor = torch.tensor(self.oppq_board, dtype=torch.float32, device=device)
+        legal_moves_mask_tensor = torch.tensor(self.mask_legal_moves(), dtype=torch.float32, device=device)
         return GameStateTorch(
             blockers_board=blockers_board_tensor,
             selfq_board=selfq_board_tensor,
-            oppq_board=oppq_board_tensor
+            oppq_board=oppq_board_tensor,
+            legal_moves_mask=legal_moves_mask_tensor
         )
 
 @dataclass
@@ -63,6 +65,7 @@ class GameStateTorch:
     blockers_board: torch.Tensor
     selfq_board: torch.Tensor
     oppq_board: torch.Tensor
+    legal_moves_mask: torch.Tensor
 
     def all_boards(self) -> torch.Tensor:
-        return torch.stack([self.selfq_board, self.oppq_board, self.blockers_board], dim=0)
+        return torch.stack([self.selfq_board, self.oppq_board, self.blockers_board, self.legal_moves_mask], dim=0)

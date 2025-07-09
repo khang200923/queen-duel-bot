@@ -136,4 +136,4 @@ class Game:
         legal_moves_num = state.mask_legal_moves().sum()
         oppo_state = self.get_state(not self.is_white_turn)
         oppo_legal_moves_num = oppo_state.mask_legal_moves().sum()
-        return legal_moves_num / 64 - oppo_legal_moves_num / 64
+        return (legal_moves_num / 64 - oppo_legal_moves_num / 64) / 2
